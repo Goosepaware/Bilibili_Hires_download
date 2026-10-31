@@ -1,0 +1,2 @@
+# Bilibili_Hires_download
+下载b站hires音源并自动分轨

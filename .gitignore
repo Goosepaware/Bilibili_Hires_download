@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Build artifacts
+build*/
+dist/
+*.spec
+*.log
+
+# Local test data / downloaded samples
+_test_out/
+*.flac
+*.m4a
+*.mp3
+*.wav
+*.eac3
+*.spectrum.png
+
+# Bundled ffmpeg (download separately)
+ffmpeg.exe
+ffprobe.exe
+
+# Local session / config (contains login cookies)
+session.bin
+config.json
+login_qr.png
+gui_error.log

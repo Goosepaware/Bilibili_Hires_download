@@ -233,3 +233,4 @@ pyinstaller --noconfirm --onefile --windowed --name bili-audio-portable `
 - 需要大会员账号才能拿到 `30251` FLAC；非大会员会明确提示并回退 AAC（可用 `--no-aac` 关闭回退）
 - 第一版只支持普通投稿视频（BV/av/短链）与多 P；番剧 PGC、付费课程、充电专属未适配
 - 下载的视频音频仅供个人学习与备份，请遵守 B 站用户协议与著作权法
+- 音质打分仅供参考，打分根据高频混叠截断来判断，歌曲EQ，LIVE版，录音室质量都肯能影响分数，不代表真实音源质量

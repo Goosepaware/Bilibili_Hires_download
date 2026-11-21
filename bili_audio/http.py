@@ -12,6 +12,7 @@ from requests.adapters import HTTPAdapter
 from .config import REFERER, UA
 
 API = "https://api.bilibili.com"
+COOKIE_DOMAIN = ".bilibili.com"
 
 HEADERS = {
     "User-Agent": UA,
@@ -43,6 +44,16 @@ class BiliError(RuntimeError):
         super().__init__(f"[{code}] {ERRORS.get(code, message or '未知错误')}")
 
 
+def bind_cookies(session: requests.Session, cookies: dict[str, str]) -> None:
+    """把 Cookie 绑定到 B 站域名，并且只在 HTTPS 下发送。
+
+    不能直接用 session.cookies.update()：那样得到的 Cookie 没有 domain，
+    会被 requests 发送给任意站点，导致 SESSDATA / bili_jct 等登录凭据泄露。
+    """
+    for k, v in cookies.items():
+        session.cookies.set(k, v, domain=COOKIE_DOMAIN, path="/", secure=True)
+
+
 def new_session(cookies: dict[str, str] | None = None) -> requests.Session:
     s = requests.Session()
     s.headers.update(HEADERS)
@@ -50,7 +61,7 @@ def new_session(cookies: dict[str, str] | None = None) -> requests.Session:
     s.mount("https://", adapter)
     s.mount("http://", adapter)
     if cookies:
-        s.cookies.update(cookies)
+        bind_cookies(s, cookies)
     return s
 
 
@@ -62,9 +73,9 @@ def ensure_buvid(session: requests.Session) -> None:
         r = session.get(f"{API}/x/frontend/finger/spi", timeout=10)
         d = r.json().get("data") or {}
         if d.get("b_3"):
-            session.cookies.set("buvid3", d["b_3"], domain=".bilibili.com")
+            session.cookies.set("buvid3", d["b_3"], domain=COOKIE_DOMAIN, path="/", secure=True)
         if d.get("b_4"):
-            session.cookies.set("buvid4", d["b_4"], domain=".bilibili.com")
+            session.cookies.set("buvid4", d["b_4"], domain=COOKIE_DOMAIN, path="/", secure=True)
     except Exception:
         pass
 

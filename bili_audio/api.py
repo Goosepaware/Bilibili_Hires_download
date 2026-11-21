@@ -2,14 +2,32 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
-from .http import BiliError, api_get
+from .http import BiliError, api_get, new_session
 from .models import Page, Video
 from .wbi import sign
 
 BV_RE = re.compile(r"(BV[0-9A-Za-z]{10})")
 AV_RE = re.compile(r"av(\d+)", re.I)
 EP_RE = re.compile(r"(?:ep|ss)(\d+)", re.I)
+
+# 只允许这些主机展开短链；其他域名一律不发请求。
+SHORT_LINK_HOSTS = frozenset({
+    "b23.tv",
+    "www.b23.tv",
+    "bili2233.cn",
+    "www.bili2233.cn",
+})
+
+
+def _is_short_link(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    host = (parsed.hostname or "").lower().rstrip(".")
+    return parsed.scheme in ("http", "https") and host in SHORT_LINK_HOSTS
 
 
 def resolve_url(session, url: str) -> str:
@@ -21,10 +39,12 @@ def resolve_url(session, url: str) -> str:
     if m:
         return "av" + m.group(1)
     if url.startswith("http"):
-        if "b23.tv" in url or "bili2233" in url:
+        # 只按解析后的主机名精确判断短链，绝不把带登录态的 session 发给用户链接。
+        if _is_short_link(url):
             try:
-                r = session.get(url, allow_redirects=True, timeout=15)
-                url = r.url
+                with new_session() as anon:
+                    r = anon.get(url, allow_redirects=True, timeout=15)
+                    url = r.url
             except Exception as e:
                 raise BiliError(-1, f"短链展开失败: {e}")
         m = BV_RE.search(url)

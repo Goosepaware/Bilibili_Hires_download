@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from .config import SESSION_FILE, dpapi_decrypt, dpapi_encrypt
-from .http import BiliError, api_get, ensure_buvid, new_session
+from .http import BiliError, api_get, bind_cookies, ensure_buvid, new_session
 
 PASSPORT = "https://passport.bilibili.com"
 
@@ -36,8 +36,7 @@ def clear_cookies() -> None:
 
 
 def apply_cookies(session, cookies: dict[str, str]) -> None:
-    for k, v in cookies.items():
-        session.cookies.set(k, v, domain=".bilibili.com")
+    bind_cookies(session, cookies)
     ensure_buvid(session)
 
 

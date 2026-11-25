@@ -91,6 +91,20 @@ def cmd_dl(args) -> int:
         try:
             results = process_url(session, url, opts, log=print)
             print(f"—— 完成 {len(results)} 个音频，用时 {time.time() - t0:.1f}s\n")
+            if args.subtitles:
+                from .subtitles import export_page
+
+                seen = set()
+                for result in results:
+                    if result.page.cid in seen:
+                        continue
+                    seen.add(result.page.cid)
+                    try:
+                        failed += export_page(session, result.video.bvid, result.page.cid,
+                                              Path(result.path).with_suffix(""))
+                    except BiliError as e:
+                        print(f"✗ P{result.page.index} 字幕：{e}")
+                        failed += 1
         except BiliError as e:
             print(f"✗ {url}: {e}\n")
             failed += 1
@@ -136,6 +150,39 @@ def cmd_verify(args) -> int:
         if a.get("verdict") not in ("LOSSLESS",):
             rc = 2
     return rc
+
+
+def cmd_subtitles(args) -> int:
+    from . import api
+    from .pipeline import parse_pages, safe_name
+    from .subtitles import export_page
+
+    session, account = auth.current_session()
+    if not account:
+        print("! 未登录或登录已过期，部分字幕可能不可用。请先运行 ba login")
+    out = _opts(args).out
+    failed = 0
+    for url in args.urls:
+        try:
+            video = api.get_video(session, api.resolve_url(session, url))
+            pages = parse_pages(args.pages, video.pages)
+            if not pages:
+                raise ValueError("未选中任何分 P")
+        except (BiliError, ValueError) as e:
+            print(f"✗ {url}：{e}")
+            failed += 1
+            continue
+        print(f"■ {video.title} ({video.bvid})")
+        for page in pages:
+            print(f"  P{page.index} {page.title}")
+            stem = out / video.bvid / f"{page.index:02d} {safe_name(page.title)}"
+            try:
+                failed += export_page(session, video.bvid, page.cid, stem,
+                                      list_only=args.list, compare=args.compare)
+            except (BiliError, OSError) as e:
+                print(f"    字幕处理失败：{e}")
+                failed += 1
+    return 1 if failed else 0
 
 
 def cmd_score(args) -> int:
@@ -259,7 +306,7 @@ def cmd_gui(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ba", description="B 站 Hi-Res 无损音频下载与真伪核验")
+    p = argparse.ArgumentParser(prog="ba", description="B 站音频与多轨字幕下载")
     sub = p.add_subparsers(dest="cmd")
 
     lp = sub.add_parser("login", help="扫码登录（或导入 cookies.txt）")
@@ -274,6 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
     dl.add_argument("urls", nargs="+")
     dl.add_argument("-o", "--out", help="输出目录")
     dl.add_argument("--atmos", action="store_true", help="同时下载杜比全景声（E-AC3）")
+    dl.add_argument("--subtitles", action="store_true", help="同时保存已下载分 P 的全部可用字幕轨")
     dl.add_argument("--no-aac", action="store_true", help="没有无损时不要回退 AAC")
     dl.add_argument("--no-verify", action="store_true", help="跳过频谱核验")
     dl.add_argument("--no-tag", action="store_true", help="不写标签/封面")
@@ -291,6 +339,15 @@ def build_parser() -> argparse.ArgumentParser:
     ip.add_argument("--atmos", action="store_true")
     ip.add_argument("--limit", default=3, help="最多显示几个分 P")
     ip.set_defaults(func=cmd_info)
+
+    subp = sub.add_parser("subtitles", help="查询并导出各分 P 的全部可用字幕轨")
+    subp.add_argument("urls", nargs="+")
+    subp.add_argument("-o", "--out", help="输出目录")
+    subp.add_argument("-p", "--pages", default="all", help="分 P，如 1 或 1,3-5（默认 all）")
+    mode = subp.add_mutually_exclusive_group()
+    mode.add_argument("--list", action="store_true", help="仅列出可用字幕轨")
+    mode.add_argument("--compare", action="store_true", help="导出字幕并生成按时间轴对齐的 JSON 对照")
+    subp.set_defaults(func=cmd_subtitles)
 
     vp = sub.add_parser("verify", help="核验本地音频文件是否为真无损")
     vp.add_argument("files", nargs="+")

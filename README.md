@@ -1,10 +1,11 @@
 # bili-audio
 
-B 站视频音频下载器，重点是 **Hi-Res 无损（FLAC 30251）** 与 **杜比全景声（E-AC3 30250）** 的获取，以及对下载结果做真实的音质核验，识别「假无损 / 升频 / 有损转码」。
+B 站音频和字幕归档工具，支持原始音轨下载、音质核验、自动分轨，以及按分 P 保存播放器提供的多条字幕（含 AI 字幕）。两条或更多字幕可按播放时间对照。
 
 ## 特性
 
 - 直连 B 站接口（WBI 签名），不依赖 yt-dlp / BBDown
+- 命令行可按分 P 单独导出全部可用字幕，也可随音频一起保存；每条字幕各存一份 SRT
 - 扫码登录，Cookie 用 Windows DPAPI 加密保存，不落明文
 - 音轨优先级：`Hi-Res 无损 FLAC` > `杜比全景声`（可选）> `最高 AAC`（回退）
 - DASH fMP4 → FLAC **只转封装不重编码**（`-c:a copy`）
@@ -45,6 +46,13 @@ winget install Gyan.FFmpeg
 # 下载（默认下载所有分 P）
 .\ba.cmd dl BV1xxxxxxxxx
 
+# 只看可用字幕，或导出字幕并生成时间轴对照
+.\ba.cmd subtitles BV1xxxxxxxxx --list
+.\ba.cmd subtitles BV1xxxxxxxxx --compare -o D:\Music\bili
+
+# 下载原始音轨，并为实际下载的分 P 保存全部可用字幕
+.\ba.cmd dl BV1xxxxxxxxx -f source --subtitles
+
 # 同时保留杜比全景声、指定输出目录、8 线程
 .\ba.cmd dl "https://www.bilibili.com/video/BV1xxxxxxxxx" -o D:\Music\bili --atmos -t 8
 
@@ -76,6 +84,13 @@ winget install Gyan.FFmpeg
 - 多 P：`输出目录/视频标题/01 分P标题.flac`
 - 每个音频旁边有同名 `.json`，记录实际音轨 ID、码率、采样率、位深、有效带宽与结论
 - 核验时额外生成 `xxx.flac.spectrum.png` 频谱图
+
+## 多轨字幕
+
+- 建议先运行 `.\ba.cmd login`，字幕可用性以当前账号和各分 P 的播放器接口返回为准。`subtitles` 命令不需要 FFmpeg，默认处理全部分 P，可用 `-p 2,5-7` 选取其中几段。
+- `subtitles --list` 只列出轨道；`subtitles` 下载各轨 UTF-8 SRT 到 `输出目录/BV号/`。`dl --subtitles` 将 SRT 写到对应音频旁。文件名含轨序号和平台语言码，同语言的多轨也会分别保存。
+- `subtitles --compare` 在一个分 P 至少导出两轨时生成 `*.subtitle.compare.json`。报告以第一轨为参照，按时间重叠列出文本，保留一对多和未对齐的字幕。它用于人工比对，不能判定语义或纠正识别错误。
+- 播放器语言标签有时与正文不同。导出时保留平台原始标签和时间轴，并提示检测到的汉字或日文假名。AI 字幕可能有漏字、断句或听写错误。只有烧录在画面里的字幕不在此功能范围内。
 
 ## 音源质检（打分 1-100）
 

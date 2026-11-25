@@ -91,7 +91,7 @@ def cmd_dl(args) -> int:
         try:
             results = process_url(session, url, opts, log=print)
             print(f"—— 完成 {len(results)} 个音频，用时 {time.time() - t0:.1f}s\n")
-            if args.subtitles:
+            if args.subtitles or args.subtitle_track is not None:
                 from .subtitles import export_page
 
                 seen = set()
@@ -101,7 +101,7 @@ def cmd_dl(args) -> int:
                     seen.add(result.page.cid)
                     try:
                         failed += export_page(session, result.video.bvid, result.page.cid,
-                                              Path(result.path).with_suffix(""))
+                                              Path(result.path).with_suffix(""), track_number=args.subtitle_track)
                     except BiliError as e:
                         print(f"✗ P{result.page.index} 字幕：{e}")
                         failed += 1
@@ -177,8 +177,8 @@ def cmd_subtitles(args) -> int:
             print(f"  P{page.index} {page.title}")
             stem = out / video.bvid / f"{page.index:02d} {safe_name(page.title)}"
             try:
-                failed += export_page(session, video.bvid, page.cid, stem,
-                                      list_only=args.list, compare=args.compare)
+                failed += export_page(session, video.bvid, page.cid, stem, list_only=args.list,
+                                      compare=args.compare, track_number=args.track)
             except (BiliError, OSError) as e:
                 print(f"    字幕处理失败：{e}")
                 failed += 1
@@ -305,6 +305,13 @@ def cmd_gui(args) -> int:
     return gui_main()
 
 
+def _subtitle_number(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("字幕轨编号从 1 开始")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ba", description="B 站音频与多轨字幕下载")
     sub = p.add_subparsers(dest="cmd")
@@ -321,7 +328,9 @@ def build_parser() -> argparse.ArgumentParser:
     dl.add_argument("urls", nargs="+")
     dl.add_argument("-o", "--out", help="输出目录")
     dl.add_argument("--atmos", action="store_true", help="同时下载杜比全景声（E-AC3）")
-    dl.add_argument("--subtitles", action="store_true", help="同时保存已下载分 P 的全部可用字幕轨")
+    dl_sub = dl.add_mutually_exclusive_group()
+    dl_sub.add_argument("--subtitles", action="store_true", help="同时保存已下载分 P 的全部可用字幕轨")
+    dl_sub.add_argument("--subtitle-track", type=_subtitle_number, metavar="编号", help="随音频仅保存指定编号的字幕轨")
     dl.add_argument("--no-aac", action="store_true", help="没有无损时不要回退 AAC")
     dl.add_argument("--no-verify", action="store_true", help="跳过频谱核验")
     dl.add_argument("--no-tag", action="store_true", help="不写标签/封面")
@@ -347,6 +356,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode = subp.add_mutually_exclusive_group()
     mode.add_argument("--list", action="store_true", help="仅列出可用字幕轨")
     mode.add_argument("--compare", action="store_true", help="导出字幕并生成按时间轴对齐的 JSON 对照")
+    mode.add_argument("--track", type=_subtitle_number, metavar="编号", help="仅保存指定编号的字幕轨")
     subp.set_defaults(func=cmd_subtitles)
 
     vp = sub.add_parser("verify", help="核验本地音频文件是否为真无损")

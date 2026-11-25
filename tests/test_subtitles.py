@@ -72,6 +72,31 @@ class SubtitleTests(unittest.TestCase):
             self.assertEqual([m["text"] for m in compared["rows"][0]["matches"]], ["第一段", "第二段"])
             self.assertEqual(compared["unmatched"][0]["text"], "额外文本")
 
+    def test_selects_only_the_numbered_track_even_with_matching_language_codes(self):
+        a, b = "//aisubtitle.hdslb.com/one", "//aisubtitle.hdslb.com/two"
+        video = SimpleNamespace(bvid=BV, title="测试", pages=[Page(1, 7, "分P一")])
+        cdn = Mock()
+        cdn.get.return_value.__enter__ = Mock(return_value=response({"from": 1, "to": 2, "content": "指定轨道"}))
+        cdn.get.return_value.__exit__ = Mock(return_value=False)
+        with tempfile.TemporaryDirectory() as temp, \
+                patch.object(cli.auth, "current_session", return_value=(object(), {"vip": False})), \
+                patch.object(api, "get_video", return_value=video), \
+                patch.object(subtitles, "get_tracks", return_value=[player_track(a), player_track(b), player_track("")]), \
+                patch.object(subtitles, "new_session") as new_session:
+            new_session.return_value.__enter__.return_value = cdn
+            logs = []
+            stem = Path(temp) / "未导出"
+            self.assertEqual(subtitles.export_page(object(), BV, 7, stem, list_only=True, log=logs.append), 0)
+            self.assertEqual([line.split()[0] for line in logs], ["#1", "#2", "#3"])
+            cdn.get.assert_not_called()
+            self.assertEqual(cli.main(["subtitles", BV, "--track", "2", "-o", temp]), 0)
+            self.assertEqual(cli.main(["subtitles", BV, "--track", "3", "-o", temp]), 1)
+            self.assertEqual(cli.main(["subtitles", BV, "--track", "4", "-o", temp]), 1)
+            cdn.get.assert_called_once_with("https://aisubtitle.hdslb.com/two", timeout=15, allow_redirects=False)
+            files = list((Path(temp) / BV).glob("*.srt"))
+            self.assertEqual([p.name for p in files], ["01 分P一.subtitle.02.zh-CN.srt"])
+            self.assertIn("指定轨道", files[0].read_text(encoding="utf-8"))
+
     def test_audio_command_only_downloads_subtitles_once_per_part(self):
         with tempfile.TemporaryDirectory() as temp, \
                 patch.object(cli.auth, "current_session", return_value=(object(), None)) as current, \
@@ -84,7 +109,10 @@ class SubtitleTests(unittest.TestCase):
             self.assertEqual(cli.main(["dl", BV, "-o", temp]), 0)
             export.assert_not_called()
             self.assertEqual(cli.main(["dl", BV, "-o", temp, "--subtitles"]), 0)
-            export.assert_called_once_with(current.return_value[0], BV, 9, stem)
+            export.assert_called_once_with(current.return_value[0], BV, 9, stem, track_number=None)
+            export.reset_mock()
+            self.assertEqual(cli.main(["dl", BV, "-o", temp, "--subtitle-track", "2"]), 0)
+            export.assert_called_once_with(current.return_value[0], BV, 9, stem, track_number=2)
 
 
 if __name__ == "__main__":

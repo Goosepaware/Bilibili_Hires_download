@@ -120,9 +120,12 @@ def _compare(exported: list[tuple[Path, list[Cue]]]) -> dict:
 
 
 def export_page(session, bvid: str, cid: int, stem: Path, *, list_only: bool = False,
-                compare: bool = False, log=print) -> int:
+                compare: bool = False, track_number: int | None = None, log=print) -> int:
     """返回实际失败的轨数。接口未提供地址的轨道单独提示。"""
     tracks = get_tracks(session, bvid, cid)
+    if track_number is not None and not 1 <= track_number <= len(tracks):
+        log(f"    没有第 {track_number} 条字幕；当前返回 {len(tracks)} 条，可用 --list 确认编号")
+        return 1
     if not tracks:
         log("    未返回字幕轨；可登录后重试")
         return 0
@@ -130,10 +133,14 @@ def export_page(session, bvid: str, cid: int, stem: Path, *, list_only: bool = F
     exported = []
     with new_session() as cdn:
         for i, track in enumerate(tracks, 1):
-            label = track_label(track)
+            if track_number is not None and i != track_number:
+                continue
+            label = f"#{i} {track_label(track)}"
             url = track.get("subtitle_url")
             if not url:
                 log(f"    {label}：没有可用的下载地址")
+                if track_number is not None:
+                    failed += 1
                 continue
             if list_only:
                 log(f"    {label}：可下载")

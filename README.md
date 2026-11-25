@@ -46,12 +46,16 @@ winget install Gyan.FFmpeg
 # 下载（默认下载所有分 P）
 .\ba.cmd dl BV1xxxxxxxxx
 
-# 只看可用字幕，或导出字幕并生成时间轴对照
+# 查看字幕轨编号，只保存第 1 P 的第 2 条字幕，或导出全部并生成时间轴对照
 .\ba.cmd subtitles BV1xxxxxxxxx --list
+.\ba.cmd subtitles BV1xxxxxxxxx -p 1 --track 2
 .\ba.cmd subtitles BV1xxxxxxxxx --compare -o D:\Music\bili
 
 # 下载原始音轨，并为实际下载的分 P 保存全部可用字幕
 .\ba.cmd dl BV1xxxxxxxxx -f source --subtitles
+
+# 下载第 1 P 的原始音轨，只保存第 2 条字幕
+.\ba.cmd dl BV1xxxxxxxxx -f source -p 1 --subtitle-track 2
 
 # 同时保留杜比全景声、指定输出目录、8 线程
 .\ba.cmd dl "https://www.bilibili.com/video/BV1xxxxxxxxx" -o D:\Music\bili --atmos -t 8
@@ -88,7 +92,8 @@ winget install Gyan.FFmpeg
 ## 多轨字幕
 
 - 建议先运行 `.\ba.cmd login`，字幕可用性以当前账号和各分 P 的播放器接口返回为准。`subtitles` 命令不需要 FFmpeg，默认处理全部分 P，可用 `-p 2,5-7` 选取其中几段。
-- `subtitles --list` 只列出轨道；`subtitles` 下载各轨 UTF-8 SRT 到 `输出目录/BV号/`。`dl --subtitles` 将 SRT 写到对应音频旁。文件名含轨序号和平台语言码，同语言的多轨也会分别保存。
+- `subtitles --list` 显示每个分 P 的轨道编号和可用状态；`subtitles --track 2` 只下载对应分 P 的第 2 轨。不加 `--track` 时下载全部可用轨。编号按每个分 P 独立计算，建议用 `-p` 选中需要的分 P。指定的轨不存在或没有下载地址时会提示，且不回退到其他轨。
+- `subtitles` 将 UTF-8 SRT 保存到 `输出目录/BV号/`。`dl --subtitles` 将全部 SRT 写到对应音频旁；`dl --subtitle-track 2` 则只保存第 2 轨。文件名含轨序号和平台语言码，同语言的多轨也能区分。
 - `subtitles --compare` 在一个分 P 至少导出两轨时生成 `*.subtitle.compare.json`。报告以第一轨为参照，按时间重叠列出文本，保留一对多和未对齐的字幕。它用于人工比对，不能判定语义或纠正识别错误。
 - 播放器语言标签有时与正文不同。导出时保留平台原始标签和时间轴，并提示检测到的汉字或日文假名。AI 字幕可能有漏字、断句或听写错误。只有烧录在画面里的字幕不在此功能范围内。
 
